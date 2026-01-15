@@ -62,7 +62,6 @@ CREATE INDEX idx_photo_tags_tag_id ON photo_tags(tag_id);
 -- ============================================
 CREATE TABLE google_drive_tokens (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
   access_token TEXT NOT NULL,
   refresh_token TEXT,
   expiry_date TIMESTAMPTZ,
@@ -73,7 +72,6 @@ CREATE TABLE google_drive_tokens (
 );
 
 -- Index for tokens
-CREATE INDEX idx_google_drive_tokens_user_id ON google_drive_tokens(user_id);
 CREATE INDEX idx_google_drive_tokens_expiry ON google_drive_tokens(expiry_date);
 
 -- ============================================
@@ -193,25 +191,7 @@ CREATE POLICY "Users can manage tags for their photos"
   );
 
 -- GOOGLE DRIVE TOKENS POLICIES
--- Users can only view their own tokens
-CREATE POLICY "Users can view their own tokens"
-  ON google_drive_tokens FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Users can insert their own tokens
-CREATE POLICY "Users can create their own tokens"
-  ON google_drive_tokens FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- Users can update their own tokens
-CREATE POLICY "Users can update their own tokens"
-  ON google_drive_tokens FOR UPDATE
-  USING (auth.uid() = user_id);
-
--- Users can delete their own tokens
-CREATE POLICY "Users can delete their own tokens"
-  ON google_drive_tokens FOR DELETE
-  USING (auth.uid() = user_id);
+-- No user-level policies; service role access only.
 
 -- ============================================
 -- INITIAL DATA (Predefined Tags)

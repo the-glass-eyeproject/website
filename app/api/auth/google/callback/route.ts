@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     });
 
     const { tokens } = await oauth2Client.getToken(code);
-    storeTokens(tokens);
+    await storeTokens(tokens);
 
     return NextResponse.redirect(new URL('/upload?connected=true', request.url));
   } catch (error) {

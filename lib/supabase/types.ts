@@ -61,6 +61,7 @@ export interface Database {
           uploaded_by?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       tags: {
         Row: {
@@ -84,6 +85,7 @@ export interface Database {
           color?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       photo_tags: {
         Row: {
@@ -104,12 +106,13 @@ export interface Database {
           tag_id?: string
           created_at?: string
         }
+        Relationships: []
       }
       google_drive_tokens: {
         Row: {
           id: string
           access_token: string
-          refresh_token: string
+          refresh_token: string | null
           expiry_date: string | null
           token_type: string | null
           scope: string | null
@@ -119,7 +122,7 @@ export interface Database {
         Insert: {
           id?: string
           access_token: string
-          refresh_token: string
+          refresh_token?: string | null
           expiry_date?: string | null
           token_type?: string | null
           scope?: string | null
@@ -129,13 +132,14 @@ export interface Database {
         Update: {
           id?: string
           access_token?: string
-          refresh_token?: string
+          refresh_token?: string | null
           expiry_date?: string | null
           token_type?: string | null
           scope?: string | null
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
     }
     Views: {
@@ -150,6 +154,9 @@ export interface Database {
       }
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deletePhoto, getPhotoById } from '@/lib/db';
+import { verifySession } from '@/lib/auth';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
 
@@ -8,6 +9,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Check authentication - only users with secret code can delete
+    const isAuthenticated = await verifySession();
+    if (!isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Please login first.' },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const photo = getPhotoById(id);
     

@@ -30,12 +30,13 @@ export async function GET() {
       // Map Drive photos to our format and sync with database
       const photos = await Promise.all(
         drivePhotos.map(async (drivePhoto) => {
-          // Try to get tags from folder name
+          // Try to get tags from folder name (should be in photos/<tag>/ structure)
           let tags: string[] = [];
           if (drivePhoto.parents && drivePhoto.parents.length > 0) {
-            const folderName = await getFolderName(drivePhoto.parents[0]);
-            if (folderName) {
-              tags = [folderName];
+            const parentFolderName = await getFolderName(drivePhoto.parents[0]);
+            if (parentFolderName && parentFolderName !== 'photos') {
+              // If parent is not 'photos', it's a tag folder
+              tags = [parentFolderName];
             }
           }
 

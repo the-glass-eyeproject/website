@@ -199,7 +199,26 @@ export async function uploadFileToDrive(
   };
 }
 
-// List all image files from Drive
+// Get the 'photos' folder ID
+export async function getPhotosFolderId(): Promise<string | null> {
+  try {
+    const drive = await getDriveClient();
+    const response = await drive.files.list({
+      q: "name='photos' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents",
+      fields: 'files(id)',
+    });
+
+    if (response.data.files && response.data.files.length > 0) {
+      return response.data.files[0].id!;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting photos folder:', error);
+    return null;
+  }
+}
+
+// List all image files from Drive within the photos folder structure
 export async function listAllPhotos(): Promise<Array<{
   id: string;
   name: string;
@@ -211,7 +230,14 @@ export async function listAllPhotos(): Promise<Array<{
 }>> {
   const drive = await getDriveClient();
 
-  // Get all image files
+  // First, get the 'photos' folder ID
+  const photosFolderId = await getPhotosFolderId();
+  if (!photosFolderId) {
+    // If photos folder doesn't exist, return empty array
+    return [];
+  }
+
+  // Get all image files within the photos folder and its subfolders
   const imageMimeTypes = [
     'image/jpeg',
     'image/png',
@@ -221,25 +247,55 @@ export async function listAllPhotos(): Promise<Array<{
     'image/svg+xml',
   ];
 
-  const query = `(${imageMimeTypes.map(mt => `mimeType='${mt}'`).join(' or ')}) and trashed=false`;
-
   const files: any[] = [];
-  let pageToken: string | undefined;
+
+  // Get all folders inside photos folder (these are tag folders)
+  const foldersResponse = await drive.files.list({
+    q: `'${photosFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id, name)',
+  });
+
+  // Search for images in each tag folder
+  if (foldersResponse.data.files && foldersResponse.data.files.length > 0) {
+    for (const folder of foldersResponse.data.files) {
+      const tagQuery = `(${imageMimeTypes.map(mt => `mimeType='${mt}'`).join(' or ')}) and trashed=false and '${folder.id}' in parents`;
+      let tagPageToken: string | undefined;
+
+      do {
+        const tagResponse = await drive.files.list({
+          q: tagQuery,
+          fields: 'nextPageToken, files(id, name, webViewLink, thumbnailLink, parents, createdTime, modifiedTime)',
+          pageSize: 1000,
+          pageToken: tagPageToken,
+        });
+
+        if (tagResponse.data.files) {
+          files.push(...tagResponse.data.files);
+        }
+
+        tagPageToken = tagResponse.data.nextPageToken || undefined;
+      } while (tagPageToken);
+    }
+  }
+
+  // Also check for images directly in the photos folder (for backwards compatibility)
+  const directQuery = `(${imageMimeTypes.map(mt => `mimeType='${mt}'`).join(' or ')}) and trashed=false and '${photosFolderId}' in parents`;
+  let directPageToken: string | undefined;
 
   do {
-    const response = await drive.files.list({
-      q: query,
+    const directResponse = await drive.files.list({
+      q: directQuery,
       fields: 'nextPageToken, files(id, name, webViewLink, thumbnailLink, parents, createdTime, modifiedTime)',
       pageSize: 1000,
-      pageToken,
+      pageToken: directPageToken,
     });
 
-    if (response.data.files) {
-      files.push(...response.data.files);
+    if (directResponse.data.files) {
+      files.push(...directResponse.data.files);
     }
 
-    pageToken = response.data.nextPageToken || undefined;
-  } while (pageToken);
+    directPageToken = directResponse.data.nextPageToken || undefined;
+  } while (directPageToken);
 
   return files.map(file => ({
     id: file.id!,

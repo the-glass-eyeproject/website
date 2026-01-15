@@ -52,9 +52,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Get or create folder for each tag (use first tag as primary folder)
+      // Get or create 'photos' folder first, then create tag folder inside it
+      const photosFolderId = await getOrCreateFolder('photos');
       const primaryTag = tags.length > 0 ? tags[0] : 'Untagged';
-      const folderId = await getOrCreateFolder(primaryTag);
+      const tagFolderId = await getOrCreateFolder(primaryTag, photosFolderId);
 
       // Upload file to Drive
       const bytes = await file.arrayBuffer();
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         buffer,
         filename,
         file.type,
-        folderId
+        tagFolderId
       );
 
       // Use direct view link for images

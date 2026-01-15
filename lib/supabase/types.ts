@@ -108,9 +108,8 @@ export interface Database {
       google_drive_tokens: {
         Row: {
           id: string
-          user_id: string
           access_token: string
-          refresh_token: string | null
+          refresh_token: string
           expiry_date: string | null
           token_type: string | null
           scope: string | null
@@ -119,9 +118,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          user_id: string
           access_token: string
-          refresh_token?: string | null
+          refresh_token: string
           expiry_date?: string | null
           token_type?: string | null
           scope?: string | null
@@ -130,9 +128,8 @@ export interface Database {
         }
         Update: {
           id?: string
-          user_id?: string
           access_token?: string
-          refresh_token?: string | null
+          refresh_token?: string
           expiry_date?: string | null
           token_type?: string | null
           scope?: string | null

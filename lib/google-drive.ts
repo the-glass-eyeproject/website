@@ -3,7 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
 
-const TOKEN_PATH = path.join(process.cwd(), 'data', 'google-token.json');
+// In serverless environments (like Vercel), use /tmp for writable storage
+// Otherwise use project data directory
+export function getTokenPath(): string {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    // Serverless environment - use /tmp
+    return '/tmp/google-token.json';
+  }
+  return path.join(process.cwd(), 'data', 'google-token.json');
+}
+
+const TOKEN_PATH = getTokenPath();
 const CREDENTIALS_PATH = path.join(process.cwd(), 'data', 'google-credentials.json');
 
 export interface GoogleDriveConfig {
@@ -24,8 +34,9 @@ export function getOAuth2Client(config: GoogleDriveConfig) {
 // Get stored tokens
 export function getStoredTokens(): { access_token?: string; refresh_token?: string; expiry_date?: number } | null {
   try {
-    if (fs.existsSync(TOKEN_PATH)) {
-      const tokenData = fs.readFileSync(TOKEN_PATH, 'utf-8');
+    const tokenPath = getTokenPath();
+    if (fs.existsSync(tokenPath)) {
+      const tokenData = fs.readFileSync(tokenPath, 'utf-8');
       return JSON.parse(tokenData);
     }
   } catch (error) {
@@ -37,14 +48,27 @@ export function getStoredTokens(): { access_token?: string; refresh_token?: stri
 // Store tokens
 export function storeTokens(tokens: any): void {
   try {
-    const dataDir = path.dirname(TOKEN_PATH);
-    if (!fs.existsSync(dataDir)) {
+    const tokenPath = getTokenPath();
+    const dataDir = path.dirname(tokenPath);
+    
+    // Only create directory if it doesn't exist and we're not in /tmp
+    if (!fs.existsSync(dataDir) && !tokenPath.startsWith('/tmp')) {
       fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 }); // Restrictive permissions
     }
+    
     // Write with restrictive permissions (owner read/write only)
-    fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+    // In /tmp, we can't set custom permissions, so just write normally
+    if (tokenPath.startsWith('/tmp')) {
+      fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
+    } else {
+      fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+    }
   } catch (error) {
     console.error('Error storing tokens:', error);
+    // In serverless, tokens in /tmp are ephemeral - this is expected
+    if (process.env.VERCEL) {
+      console.warn('Note: Tokens stored in /tmp are ephemeral in Vercel. Consider using a database or Vercel KV for persistent storage.');
+    }
   }
 }
 

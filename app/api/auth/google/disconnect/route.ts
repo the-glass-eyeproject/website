@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
-import path from 'path';
+import { getTokenPath } from '@/lib/google-drive';
 
 export async function POST() {
   try {
-    const tokenPath = path.join(process.cwd(), 'data', 'google-token.json');
+    const tokenPath = getTokenPath();
     if (fs.existsSync(tokenPath)) {
       fs.unlinkSync(tokenPath);
     }

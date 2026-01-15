@@ -17,22 +17,34 @@ export interface Photo {
   height?: number;
 }
 
-const DB_PATH = path.join(process.cwd(), 'data', 'photos.json');
+// In serverless environments (like Vercel), use /tmp for writable storage
+// Otherwise use project data directory
+const getDbPath = (): string => {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    // Serverless environment - use /tmp
+    return '/tmp/photos.json';
+  }
+  return path.join(process.cwd(), 'data', 'photos.json');
+};
 
 function ensureDbExists() {
-  const dataDir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dataDir)) {
+  const dbPath = getDbPath();
+  const dataDir = path.dirname(dbPath);
+  
+  // Only create directory if it doesn't exist and we're not in /tmp
+  if (!fs.existsSync(dataDir) && !dbPath.startsWith('/tmp')) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify([], null, 2));
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify([], null, 2));
   }
 }
 
 export function getAllPhotos(): Photo[] {
   ensureDbExists();
   try {
-    const data = fs.readFileSync(DB_PATH, 'utf-8');
+    const dbPath = getDbPath();
+    const data = fs.readFileSync(dbPath, 'utf-8');
     return JSON.parse(data);
   } catch {
     return [];
@@ -60,7 +72,8 @@ export function savePhoto(photo: Photo): void {
     photos.push(photo);
   }
   
-  fs.writeFileSync(DB_PATH, JSON.stringify(photos, null, 2));
+  const dbPath = getDbPath();
+  fs.writeFileSync(dbPath, JSON.stringify(photos, null, 2));
 }
 
 export function deletePhoto(id: string): boolean {
@@ -72,7 +85,8 @@ export function deletePhoto(id: string): boolean {
     return false; // Photo not found
   }
   
-  fs.writeFileSync(DB_PATH, JSON.stringify(filtered, null, 2));
+  const dbPath = getDbPath();
+  fs.writeFileSync(dbPath, JSON.stringify(filtered, null, 2));
   return true;
 }
 

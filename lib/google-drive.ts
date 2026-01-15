@@ -22,7 +22,7 @@ export function getOAuth2Client(config: GoogleDriveConfig) {
 }
 
 // Get stored tokens
-export function getStoredTokens(): { access_token?: string; refresh_token?: string } | null {
+export function getStoredTokens(): { access_token?: string; refresh_token?: string; expiry_date?: number } | null {
   try {
     if (fs.existsSync(TOKEN_PATH)) {
       const tokenData = fs.readFileSync(TOKEN_PATH, 'utf-8');

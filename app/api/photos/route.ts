@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAllPhotos, savePhoto } from '@/lib/db';
-import { listAllPhotos, getFolderName, getStoredTokens } from '@/lib/google-drive';
+import { listAllPhotos, getFolderName, isGoogleDriveConnected } from '@/lib/google-drive-supabase';
 import { verifySession } from '@/lib/auth';
 
 export async function GET() {
@@ -18,8 +18,8 @@ export async function GET() {
 
     if (storageProvider === 'google-drive') {
       // Check if Google Drive is connected
-      const tokens = getStoredTokens();
-      if (!tokens || !tokens.access_token) {
+      const connected = await isGoogleDriveConnected();
+      if (!connected) {
         // Return empty array if not connected
         return NextResponse.json([]);
       }

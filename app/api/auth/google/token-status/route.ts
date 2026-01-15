@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getStoredTokens } from '@/lib/google-drive';
+import { isGoogleDriveConnected } from '@/lib/google-drive-supabase';
 
-// Public endpoint to check if Google Drive tokens exist
-// This doesn't require authentication since we need to know if tokens exist
-// to determine if user needs to connect their Drive
+// Public endpoint to check if Google Drive is connected
+// This doesn't require authentication since we need to know if Drive is connected
 export async function GET() {
   try {
-    const tokens = getStoredTokens();
-    const hasTokens = !!(tokens && tokens.access_token);
-    
-    return NextResponse.json({ hasTokens });
+    const connected = await isGoogleDriveConnected();
+    return NextResponse.json({ hasTokens: connected });
   } catch (error) {
     return NextResponse.json({ hasTokens: false });
   }

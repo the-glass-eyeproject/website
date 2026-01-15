@@ -4,7 +4,7 @@ import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { savePhoto } from '@/lib/db';
 import { verifySession } from '@/lib/auth';
-import { getOrCreateFolder, uploadFileToDrive, getStoredTokens } from '@/lib/google-drive';
+import { getOrCreateFolder, uploadFileToDrive, isGoogleDriveConnected } from '@/lib/google-drive-supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
 
     if (storageProvider === 'google-drive') {
       // Check if Google Drive is connected
-      const tokens = getStoredTokens();
-      if (!tokens || !tokens.access_token) {
+      const connected = await isGoogleDriveConnected();
+      if (!connected) {
         return NextResponse.json(
           { error: 'Google Drive not connected. Please connect your Drive first.' },
           { status: 400 }

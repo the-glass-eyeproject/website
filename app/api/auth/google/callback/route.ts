@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOAuth2Client, storeTokens } from '@/lib/google-drive';
+import { getOAuth2Client, storeTokens } from '@/lib/google-drive-supabase';
 
 export async function GET(request: NextRequest) {
   try {

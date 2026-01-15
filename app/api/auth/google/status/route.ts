@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStoredTokens } from '@/lib/google-drive';
+import { isGoogleDriveConnected } from '@/lib/google-drive-supabase';
 import { verifySession } from '@/lib/auth';
 
 export async function GET() {
@@ -13,10 +13,9 @@ export async function GET() {
       );
     }
 
-    const tokens = getStoredTokens();
-    const isConnected = !!(tokens && tokens.access_token);
+    const connected = await isGoogleDriveConnected();
     
-    return NextResponse.json({ connected: isConnected });
+    return NextResponse.json({ connected });
   } catch (error) {
     return NextResponse.json({ connected: false });
   }

@@ -3,22 +3,26 @@ import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/
 import { cookies } from 'next/headers'
 import { Database } from './types'
 
+/**
+ * Create a Supabase client for server-side operations
+ * Uses the publishable key (replaces legacy anon key)
+ * Combined with Supabase Auth for user-level access control via RLS
+ */
 export async function createClient() {
   const cookieStore = await cookies()
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
-  if (!supabaseUrl || !anonKey) {
+  if (!supabaseUrl || !publishableKey) {
     throw new Error(
-      'Supabase environment variables are missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file. ' +
-      'See SUPABASE_SETUP.md for instructions.'
-    );
+      'Supabase environment variables are missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in your .env.local file.'
+    )
   }
 
   return createServerClient<Database>(
     supabaseUrl,
-    anonKey,
+    publishableKey,
     {
       cookies: {
         getAll() {
@@ -40,21 +44,24 @@ export async function createClient() {
   )
 }
 
-// Service role client for admin operations (use with caution!)
-// Uses regular Supabase client (not SSR) since service role doesn't need cookies
+/**
+ * Create a Supabase client with elevated privileges for admin operations
+ * Uses the secret key (replaces legacy service_role key)
+ * 
+ * WARNING: This bypasses Row Level Security!
+ * Only use in secure server-side code, never expose to clients.
+ */
 export function createServiceClient(): SupabaseClient<Database> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const secretKey = process.env.SUPABASE_SECRET_KEY
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl || !secretKey) {
     throw new Error(
-      'Supabase environment variables are missing. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your .env.local file. ' +
-      'See SUPABASE_SETUP.md for instructions.'
-    );
+      'Supabase environment variables are missing. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY in your .env.local file.'
+    )
   }
 
-  // Use regular createClient for service role (no cookies needed)
-  return createSupabaseClient<Database>(supabaseUrl, serviceRoleKey, {
+  return createSupabaseClient<Database>(supabaseUrl, secretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

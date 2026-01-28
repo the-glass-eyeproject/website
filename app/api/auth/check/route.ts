@@ -1,11 +1,19 @@
-import { NextResponse } from 'next/server';
-import { verifySession } from '@/lib/auth';
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
-    const isAuthenticated = await verifySession();
-    return NextResponse.json({ authenticated: isAuthenticated });
-  } catch (error) {
-    return NextResponse.json({ authenticated: false });
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    return NextResponse.json({
+      authenticated: !!user,
+      user: user ? {
+        id: user.id,
+        email: user.email,
+      } : null,
+    })
+  } catch {
+    return NextResponse.json({ authenticated: false, user: null })
   }
 }

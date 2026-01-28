@@ -1,148 +1,151 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
-import { PREDEFINED_TAGS } from '@/lib/tags';
+import { useState, useRef, useEffect } from 'react';
+import { Upload, X, Image as ImageIcon, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Tag } from '@/lib/supabase/types';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 
-interface FileWithPreview {
-  file: File;
-  preview: string;
-  customName: string;
-  id: string;
+interface UploadFormProps {
+  onSuccess?: () => void;
 }
 
-export default function UploadForm() {
+export default function UploadForm({ onSuccess }: UploadFormProps) {
   const { toast } = useToast();
-  const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles: FileWithPreview[] = Array.from(e.target.files).map((file) => {
-        const preview = URL.createObjectURL(file);
-        return {
-          file,
-          preview,
-          customName: file.name.replace(/\.[^/.]+$/, ''), // Remove extension for custom name
-          id: Math.random().toString(36).substring(7),
-        };
-      });
-      setFiles(prev => [...prev, ...newFiles]);
+  useEffect(() => {
+    fetchTags();
+  }, []);
+
+  const fetchTags = async () => {
+    try {
+      const response = await fetch('/api/tags');
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableTags(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tags:', error);
     }
   };
 
-  const removeFile = (id: string) => {
-    setFiles(prev => {
-      const fileToRemove = prev.find(f => f.id === id);
-      if (fileToRemove) {
-        URL.revokeObjectURL(fileToRemove.preview);
-      }
-      return prev.filter(f => f.id !== id);
-    });
-  };
-
-  const updateFileName = (id: string, newName: string) => {
-    setFiles(prev =>
-      prev.map(f => f.id === id ? { ...f, customName: newName } : f)
-    );
-  };
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (files.length === 0) {
+  const handleFileSelect = (selectedFile: File) => {
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(selectedFile.type)) {
       toast({
-        title: 'Error',
-        description: 'Please select at least one file',
+        title: 'Invalid file type',
+        description: 'Please select a JPEG, PNG, GIF, or WebP image',
         variant: 'destructive',
       });
       return;
     }
 
+    // Validate file size (20MB)
+    if (selectedFile.size > 20 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Maximum file size is 20MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFile(selectedFile);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => setPreview(e.target?.result as string);
+    reader.readAsDataURL(selectedFile);
+    
+    // Auto-fill title from filename
+    const nameWithoutExt = selectedFile.name.replace(/\.[^/.]+$/, '');
+    setTitle(nameWithoutExt.replace(/[-_]/g, ' '));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      handleFileSelect(droppedFile);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+
     setUploading(true);
-
     try {
-      // Upload files sequentially
-      let successCount = 0;
-      let errorCount = 0;
+      // Step 1: Upload file to storage
+      const formData = new FormData();
+      formData.append('file', file);
 
-      for (const fileWithPreview of files) {
-        try {
-          const formData = new FormData();
-          formData.append('file', fileWithPreview.file);
-          formData.append('tags', JSON.stringify(selectedTags));
-          formData.append('customName', fileWithPreview.customName);
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            if (response.status === 401) {
-              toast({
-                title: 'Unauthorized',
-                description: 'Please login first',
-                variant: 'destructive',
-              });
-              setTimeout(() => {
-                window.location.href = '/upload';
-              }, 1500);
-              return;
-            }
-            throw new Error(errorData.error || 'Upload failed');
-          }
-
-          successCount++;
-        } catch (err) {
-          errorCount++;
-          console.error(`Failed to upload ${fileWithPreview.file.name}:`, err);
-        }
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        throw new Error(error.error || 'Upload failed');
       }
 
-      if (successCount > 0) {
-        toast({
-          title: 'Success',
-          description: `${successCount} photo(s) uploaded successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
-        });
-      } else {
-        toast({
-          title: 'Upload Failed',
-          description: 'All uploads failed',
-          variant: 'destructive',
-        });
-        return;
+      const uploadResult = await uploadResponse.json();
+
+      // Step 2: Create photo record
+      const photoResponse = await fetch('/api/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title || null,
+          description: description || null,
+          filename: file.name,
+          storage_key: uploadResult.storage_key,
+          storage_url: uploadResult.storage_url,
+          width: uploadResult.width,
+          height: uploadResult.height,
+          size: uploadResult.size,
+          mime_type: uploadResult.mime_type,
+          is_public: isPublic,
+          tags: selectedTags,
+        }),
+      });
+
+      if (!photoResponse.ok) {
+        throw new Error('Failed to create photo record');
       }
 
-      // Clean up preview URLs
-      files.forEach(f => URL.revokeObjectURL(f.preview));
-      
-      setFiles([]);
+      toast({
+        title: 'Upload complete',
+        description: 'Your photo has been uploaded successfully',
+      });
+
+      // Reset form
+      setFile(null);
+      setPreview(null);
+      setTitle('');
+      setDescription('');
+      setIsPublic(false);
       setSelectedTags([]);
       
-      // Reset file input
-      const fileInput = document.getElementById('file-input') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-
-      // Refresh gallery
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (err) {
+      onSuccess?.();
+    } catch (error) {
       toast({
-        title: 'Upload Failed',
-        description: err instanceof Error ? err.message : 'Upload failed',
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'An error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -150,120 +153,177 @@ export default function UploadForm() {
     }
   };
 
-  return (
-    <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-6 mb-8 transition-colors">
-      <h2 className="text-xl font-light text-zinc-900 dark:text-zinc-100 mb-4 transition-colors">Upload Photos</h2>
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label
-            htmlFor="file-input"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2 transition-colors"
-          >
-            Select Photos (Multiple allowed)
-          </label>
-          <input
-            id="file-input"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileChange}
-            className="block w-full text-sm text-zinc-600 dark:text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-zinc-200 dark:file:bg-zinc-800 file:text-zinc-900 dark:file:text-zinc-200 hover:file:bg-zinc-300 dark:hover:file:bg-zinc-700 cursor-pointer transition-colors"
-          />
-        </div>
+  const toggleTag = (slug: string) => {
+    setSelectedTags(prev => 
+      prev.includes(slug)
+        ? prev.filter(t => t !== slug)
+        : [...prev, slug]
+    );
+  };
 
-        {/* File Previews */}
-        {files.length > 0 && (
+  const clearFile = () => {
+    setFile(null);
+    setPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Drop Zone */}
+      {!file ? (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`
+            relative border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
+            transition-all duration-200
+            ${dragOver 
+              ? 'border-accent bg-accent/5' 
+              : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
+            }
+          `}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+            className="hidden"
+          />
+          
+          <div className="flex flex-col items-center">
+            <div className={`
+              p-4 rounded-full mb-4 transition-colors
+              ${dragOver ? 'bg-accent/10 text-accent' : 'bg-muted text-muted-foreground'}
+            `}>
+              <Upload size={32} />
+            </div>
+            <p className="font-display text-xl text-foreground mb-2">
+              Drop your image here
+            </p>
+            <p className="text-sm text-muted-foreground">
+              or click to browse
+            </p>
+            <p className="text-xs text-muted-foreground mt-3">
+              JPEG, PNG, GIF, WebP • Max 20MB
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Preview */}
+          <div className="relative rounded-lg overflow-hidden bg-muted">
+            <img
+              src={preview!}
+              alt="Preview"
+              className="w-full max-h-96 object-contain"
+            />
+            <button
+              onClick={clearFile}
+              className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Form Fields */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 transition-colors">
-              Selected Photos ({files.length})
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {files.map((fileWithPreview) => (
-                <div
-                  key={fileWithPreview.id}
-                  className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 space-y-2 transition-colors"
-                >
-                  <div className="relative aspect-square rounded-md overflow-hidden bg-zinc-100 dark:bg-zinc-900">
-                    <Image
-                      src={fileWithPreview.preview}
-                      alt={fileWithPreview.file.name}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                        File Name
-                      </label>
-                      <input
-                        type="text"
-                        value={fileWithPreview.customName}
-                        onChange={(e) => updateFileName(fileWithPreview.id, e.target.value)}
-                        className="w-full px-2 py-1 text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:focus:ring-zinc-600 transition-colors"
-                        placeholder="Enter file name"
-                      />
-                      <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">
-                        Original: {fileWithPreview.file.name}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(fileWithPreview.id)}
-                      className="w-full py-1.5 px-3 text-xs bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 rounded-md font-medium transition-colors border border-red-200 dark:border-red-900/50"
-                    >
-                      Remove
-                    </button>
-                  </div>
+            {/* Title */}
+            <div>
+              <label className="input-label">Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Give your photo a title..."
+                className="input"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="input-label">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Add a description that will appear on hover..."
+                rows={3}
+                className="input resize-none"
+              />
+            </div>
+
+            {/* Visibility */}
+            <div className="flex items-center justify-between py-3 px-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                {isPublic ? (
+                  <Eye size={20} className="text-green-600 dark:text-green-400" />
+                ) : (
+                  <EyeOff size={20} className="text-orange-600 dark:text-orange-400" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">
+                    {isPublic ? 'Public' : 'Private'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isPublic 
+                      ? 'Visible to everyone' 
+                      : 'Only visible to you'
+                    }
+                  </p>
                 </div>
-              ))}
+              </div>
+              <Switch
+                checked={isPublic}
+                onCheckedChange={setIsPublic}
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="input-label mb-2">Tags</label>
+              <div className="flex flex-wrap gap-2">
+                {availableTags.map(tag => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTag(tag.slug)}
+                    className={`tag-pill ${
+                      selectedTags.includes(tag.slug) 
+                        ? 'tag-pill-active' 
+                        : 'tag-pill-outline'
+                    }`}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        )}
 
-        <div>
-          <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3 transition-colors">
-            Tags (select one or more)
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {PREDEFINED_TAGS.map((tag, index) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => toggleTag(tag)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors relative ${
-                  selectedTags.includes(tag)
-                    ? selectedTags.indexOf(tag) === 0 && selectedTags.length > 1
-                      ? 'bg-zinc-800 dark:bg-zinc-600 text-zinc-100 border-2 border-zinc-900 dark:border-zinc-500'
-                      : 'bg-zinc-700 dark:bg-zinc-700 text-zinc-100 border border-zinc-600 dark:border-zinc-600'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-750 hover:text-zinc-900 dark:hover:text-zinc-300'
-                }`}
-                title={selectedTags.indexOf(tag) === 0 && selectedTags.length > 1 ? 'Primary tag - photo will be uploaded to this folder' : ''}
-              >
-                {tag}
-                {selectedTags.indexOf(tag) === 0 && selectedTags.length > 1 && (
-                  <span className="ml-1 text-xs">*</span>
-                )}
-              </button>
-            ))}
-          </div>
-          {selectedTags.length > 1 && (
-            <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 transition-colors">
-              <span className="font-medium">Note:</span> Photo will be uploaded to the <span className="font-medium">"{selectedTags[0]}"</span> folder (first tag). All tags will be saved for filtering.
-            </p>
-          )}
+          {/* Upload Button */}
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="btn-accent w-full flex items-center justify-center gap-2 py-3"
+          >
+            {uploading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <ImageIcon size={18} />
+                Upload Photo
+              </>
+            )}
+          </button>
         </div>
-
-        <button
-          type="submit"
-          disabled={files.length === 0 || uploading}
-          className="w-full py-2.5 px-4 bg-zinc-900 dark:bg-zinc-800 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-100 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-800 dark:border-zinc-700"
-        >
-          {uploading ? `Uploading ${files.length} photo(s)...` : `Upload ${files.length > 0 ? `${files.length} ` : ''}Photo(s)`}
-        </button>
-      </form>
+      )}
     </div>
   );
 }

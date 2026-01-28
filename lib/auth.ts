@@ -1,30 +1,67 @@
-// Simple authentication using secret code
-import { cookies } from 'next/headers';
+// Authentication utilities using Supabase Auth
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 
-const SECRET_CODE = process.env.SECRET_CODE || 'glass-eye-2024';
-const SESSION_COOKIE_NAME = 'glass-eye-session';
-
-export function getSecretCode(): string {
-  return SECRET_CODE;
+/**
+ * Check if user is authenticated (server-side)
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    return !!user
+  } catch {
+    return false
+  }
 }
 
-export async function verifySession(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const session = cookieStore.get(SESSION_COOKIE_NAME);
-  return session?.value === 'authenticated';
+/**
+ * Get current user (server-side)
+ */
+export async function getCurrentUser() {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    return user
+  } catch {
+    return null
+  }
 }
 
-export async function createSession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, 'authenticated', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-  });
+/**
+ * Sign in with email and password (client-side)
+ */
+export async function signIn(email: string, password: string) {
+  const supabase = createBrowserClient()
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+  
+  if (error) {
+    throw error
+  }
+  
+  return data
 }
 
-export async function destroySession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
+/**
+ * Sign out (client-side)
+ */
+export async function signOut() {
+  const supabase = createBrowserClient()
+  const { error } = await supabase.auth.signOut()
+  
+  if (error) {
+    throw error
+  }
+}
+
+/**
+ * Get session (client-side)
+ */
+export async function getSession() {
+  const supabase = createBrowserClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  return session
 }

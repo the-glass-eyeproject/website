@@ -16,10 +16,17 @@ export const PREDEFINED_TAGS = [
   'Documentary',
   'Fine Art',
   'Experimental',
-] as const;
+] as const
 
-export type PredefinedTag = typeof PREDEFINED_TAGS[number];
+export type PredefinedTag = typeof PREDEFINED_TAGS[number]
 
 export function isValidTag(tag: string): tag is PredefinedTag {
-  return PREDEFINED_TAGS.includes(tag as PredefinedTag);
+  return PREDEFINED_TAGS.includes(tag as PredefinedTag)
+}
+
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
 }

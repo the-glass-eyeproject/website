@@ -1,48 +1,45 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { PREDEFINED_TAGS } from '@/lib/tags';
-import { useToast } from '@/hooks/use-toast';
-import EditTagsModal from './EditTagsModal';
+import { Download, Eye, EyeOff } from 'lucide-react';
+import { PhotoWithTags, Tag } from '@/lib/supabase/types';
 
-interface Photo {
-  id: string;
-  filename: string;
-  url: string;
-  tags: string[];
-  uploadedAt: string;
+interface GalleryProps {
+  isAdmin?: boolean;
+  onEditPhoto?: (photo: PhotoWithTags) => void;
 }
 
-export default function Gallery() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [filteredPhotos, setFilteredPhotos] = useState<Photo[]>([]);
+export default function Gallery({ isAdmin = false, onEditPhoto }: GalleryProps) {
+  const [photos, setPhotos] = useState<PhotoWithTags[]>([]);
+  const [tags, setTags] = useState<(Tag & { count: number })[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
+  const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchPhotos();
-  }, []);
+    fetchTags();
+  }, [isAdmin]);
 
   useEffect(() => {
     if (selectedTag) {
-      setFilteredPhotos(photos.filter(p => p.tags.includes(selectedTag)));
+      fetchPhotos(selectedTag);
     } else {
-      setFilteredPhotos(photos);
+      fetchPhotos();
     }
-  }, [selectedTag, photos]);
+  }, [selectedTag]);
 
-  const fetchPhotos = async () => {
+  const fetchPhotos = async (tag?: string) => {
     try {
-      const response = await fetch('/api/photos');
+      const params = new URLSearchParams();
+      if (tag) params.set('tag', tag);
+      if (isAdmin) params.set('includePrivate', 'true');
+      
+      const response = await fetch(`/api/photos?${params}`);
       if (response.ok) {
         const data = await response.json();
         setPhotos(data);
-        setFilteredPhotos(data);
       }
     } catch (error) {
       console.error('Failed to fetch photos:', error);
@@ -51,178 +48,208 @@ export default function Gallery() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this photo?')) {
-      return;
-    }
-
+  const fetchTags = async () => {
     try {
-      const response = await fetch(`/api/photos/${id}`, {
-        method: 'DELETE',
-      });
-
+      const response = await fetch('/api/tags');
       if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Photo deleted successfully',
-        });
-        fetchPhotos();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete photo');
+        const data = await response.json();
+        setTags(data.filter((t: Tag & { count: number }) => t.count > 0));
       }
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete photo',
-        variant: 'destructive',
-      });
+      console.error('Failed to fetch tags:', error);
+    }
+  };
+
+  const handleDownload = async (photo: PhotoWithTags) => {
+    try {
+      const response = await fetch(`/api/photos/${photo.id}/download`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = photo.title || `glasseye_${photo.id}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
     }
   };
 
   if (loading) {
     return (
-      <div className="text-center py-12 text-zinc-600 dark:text-zinc-400 transition-colors">
-        Loading gallery...
+      <div className="masonry-grid">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="masonry-item">
+            <div 
+              className="skeleton w-full rounded"
+              style={{ height: `${200 + Math.random() * 200}px` }}
+            />
+          </div>
+        ))}
       </div>
     );
   }
 
   if (photos.length === 0) {
     return (
-      <div className="text-center py-12 text-zinc-600 dark:text-zinc-400 transition-colors">
-        <p className="text-lg mb-2">No photos yet</p>
-        <p className="text-sm">Upload your first photo to get started</p>
+      <div className="text-center py-24">
+        <div className="font-display text-3xl text-muted-foreground mb-3">
+          {selectedTag ? 'No photographs found' : 'The gallery awaits'}
+        </div>
+        <p className="text-muted-foreground text-sm">
+          {selectedTag 
+            ? `No images tagged with "${selectedTag}" yet`
+            : 'Photographs will appear here once uploaded'
+          }
+        </p>
+        {selectedTag && (
+          <button
+            onClick={() => setSelectedTag(null)}
+            className="mt-4 text-accent hover:underline text-sm"
+          >
+            Clear filter
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-light text-zinc-900 dark:text-zinc-100 transition-colors">
-          Gallery {selectedTag && `- ${selectedTag}`}
-        </h2>
-        <div className="flex items-center gap-3">
-          {selectedTag && (
-            <button
-              onClick={() => setSelectedTag(null)}
-              className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 underline transition-colors"
-            >
-              Clear filter
-            </button>
-          )}
+      {/* Tag Filter */}
+      {tags.length > 0 && (
+        <div className="mb-8 flex flex-wrap gap-2">
           <button
-            onClick={() => router.push('/upload')}
-            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-md text-sm font-medium transition-colors border border-zinc-300 dark:border-zinc-700"
+            onClick={() => setSelectedTag(null)}
+            className={`tag-pill ${!selectedTag ? 'tag-pill-active' : 'tag-pill-outline'}`}
           >
-            Upload Photo
+            All
           </button>
-        </div>
-      </div>
-
-      <div className="mb-6 flex flex-wrap gap-2">
-        {PREDEFINED_TAGS.map(tag => {
-          const count = photos.filter(p => p.tags.includes(tag)).length;
-          if (count === 0) return null;
-          
-          return (
+          {tags.map(tag => (
             <button
-              key={tag}
-              onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                selectedTag === tag
-                  ? 'bg-zinc-700 dark:bg-zinc-700 text-zinc-100 border border-zinc-600 dark:border-zinc-600'
-                  : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-300'
-              }`}
+              key={tag.id}
+              onClick={() => setSelectedTag(selectedTag === tag.slug ? null : tag.slug)}
+              className={`tag-pill ${selectedTag === tag.slug ? 'tag-pill-active' : 'tag-pill-outline'}`}
             >
-              {tag} ({count})
+              {tag.name}
+              <span className="ml-1.5 opacity-60">{tag.count}</span>
             </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredPhotos.map(photo => (
-          <div
-            key={photo.id}
-            className="group relative bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+      {/* Masonry Grid */}
+      <div className="masonry-grid">
+        {photos.map((photo) => (
+          <div 
+            key={photo.id} 
+            className="masonry-item"
           >
-            <div className="aspect-square relative overflow-hidden">
-              <Image
-                src={photo.url}
-                alt={photo.filename}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              />
-            </div>
-            
-            <div className="p-3">
-              <div className="flex flex-wrap gap-1 mb-2">
-                {photo.tags.map((tag, index) => (
-                  <span
-                    key={tag}
-                    className={`text-xs px-2 py-0.5 rounded transition-colors ${
-                      index === 0 && photo.tags.length > 1
-                        ? 'bg-zinc-300 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-medium'
-                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-400'
-                    }`}
-                    title={index === 0 && photo.tags.length > 1 ? 'Primary tag (folder location)' : ''}
-                  >
-                    {tag}
-                    {index === 0 && photo.tags.length > 1 && ' *'}
-                  </span>
-                ))}
-                {photo.tags.length === 0 && (
-                  <span className="text-xs px-2 py-0.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 rounded">
-                    Untagged
-                  </span>
+            <div className="image-card group cursor-pointer">
+              {/* Image */}
+              <div className="relative">
+                {!imageLoaded[photo.id] && (
+                  <div 
+                    className="skeleton absolute inset-0"
+                    style={{ 
+                      paddingBottom: photo.height && photo.width 
+                        ? `${(photo.height / photo.width) * 100}%` 
+                        : '75%' 
+                    }}
+                  />
                 )}
-              </div>
-              
-              <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-2 truncate transition-colors">
-                {photo.filename}
-              </p>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setEditingPhoto(photo)}
-                  className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 underline transition-colors"
-                >
-                  Edit Tags
-                </button>
-                <span className="text-zinc-400 dark:text-zinc-600">•</span>
-                <button
-                  onClick={() => handleDelete(photo.id)}
-                  className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline transition-colors"
-                >
-                  Delete
-                </button>
+                <Image
+                  src={photo.storage_url}
+                  alt={photo.title || photo.filename}
+                  width={photo.width || 800}
+                  height={photo.height || 600}
+                  className={`w-full h-auto transition-opacity duration-300 ${
+                    imageLoaded[photo.id] ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  onLoad={() => setImageLoaded(prev => ({ ...prev, [photo.id]: true }))}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                />
+                
+                {/* Visibility indicator for admin */}
+                {isAdmin && (
+                  <div className={`absolute top-3 left-3 p-1.5 rounded-full ${
+                    photo.is_public 
+                      ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+                      : 'bg-orange-500/20 text-orange-600 dark:text-orange-400'
+                  }`}>
+                    {photo.is_public ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </div>
+                )}
+
+                {/* Overlay */}
+                <div className="image-overlay" />
+                
+                {/* Info overlay */}
+                <div className="image-info">
+                  {photo.title && (
+                    <h3 className="font-display text-xl text-white mb-1">
+                      {photo.title}
+                    </h3>
+                  )}
+                  {photo.description && (
+                    <p className="text-white/80 text-sm line-clamp-2 mb-3">
+                      {photo.description}
+                    </p>
+                  )}
+                  
+                  {/* Tags */}
+                  {photo.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {photo.tags.slice(0, 3).map(tag => (
+                        <span 
+                          key={tag.id}
+                          className="text-xs text-white/70 bg-white/10 px-2 py-0.5 rounded"
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
+                      {photo.tags.length > 3 && (
+                        <span className="text-xs text-white/50">
+                          +{photo.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload(photo);
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white transition-colors"
+                    >
+                      <Download size={14} />
+                      Download
+                    </button>
+                    {isAdmin && onEditPhoto && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditPhoto(photo);
+                        }}
+                        className="text-xs text-white/90 hover:text-white transition-colors ml-auto"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         ))}
       </div>
-
-      {filteredPhotos.length === 0 && selectedTag && (
-        <div className="text-center py-12 text-zinc-600 dark:text-zinc-400 transition-colors">
-          No photos found with tag "{selectedTag}"
-        </div>
-      )}
-
-      {editingPhoto && (
-        <EditTagsModal
-          isOpen={!!editingPhoto}
-          onClose={() => setEditingPhoto(null)}
-          photoId={editingPhoto.id}
-          currentTags={editingPhoto.tags}
-          onSuccess={() => {
-            fetchPhotos();
-            setEditingPhoto(null);
-          }}
-        />
-      )}
     </div>
   );
 }

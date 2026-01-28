@@ -280,30 +280,32 @@ export default function Gallery({ isAdmin = false, onEditPhoto }: GalleryProps) 
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload(photo);
-                      }}
-                      className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white transition-colors"
-                    >
-                      <Download size={14} />
-                      Download
-                    </button>
-                    {isAdmin && onEditPhoto && (
+                  {/* Actions - only for admin */}
+                  {isAdmin && (
+                    <div className="flex gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEditPhoto(photo);
+                          handleDownload(photo);
                         }}
-                        className="text-xs text-white/90 hover:text-white transition-colors ml-auto"
+                        className="flex items-center gap-1.5 text-xs text-white/90 hover:text-white transition-colors"
                       >
-                        Edit
+                        <Download size={14} />
+                        Download
                       </button>
-                    )}
-                  </div>
+                      {onEditPhoto && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditPhoto(photo);
+                          }}
+                          className="text-xs text-white/90 hover:text-white transition-colors ml-auto"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -411,17 +413,19 @@ export default function Gallery({ isAdmin = false, onEditPhoto }: GalleryProps) 
                 </div>
               )}
 
-              {/* Download button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownload(lightboxPhoto);
-                }}
-                className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white transition-colors"
-              >
-                <Download size={16} />
-                Download
-              </button>
+              {/* Download button - only for admin */}
+              {isAdmin && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(lightboxPhoto);
+                  }}
+                  className="inline-flex items-center gap-2 text-sm text-white/80 hover:text-white transition-colors"
+                >
+                  <Download size={16} />
+                  Download
+                </button>
+              )}
             </div>
           </div>
 

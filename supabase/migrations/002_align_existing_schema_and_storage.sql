@@ -17,7 +17,9 @@ begin
   ) then
     execute 'update public.photos set storage_url = url where storage_url is null';
   end if;
-end $$;
+end $;
+
+alter table public.photos alter column storage_url set not null;
 
 -- Keep existing storage metadata, but use Supabase Storage for new uploads.
 alter table public.photos alter column storage_provider set default 'supabase';

@@ -60,3 +60,6 @@ Open [http://localhost:3000](http://localhost:3000).
 - The Supabase publishable key is designed for browser use; never expose a secret/service-role key.
 - The Storage bucket is private. Do not change it to public.
 - Keep original uploads and database visibility in sync. Deleting a gallery record also removes its stored image.
+
+
+This branch includes an automated GitHub Actions type-check and production-build check.

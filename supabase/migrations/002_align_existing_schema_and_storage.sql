@@ -21,6 +21,8 @@ end $$;
 
 -- Keep existing storage metadata, but use Supabase Storage for new uploads.
 alter table public.photos alter column storage_provider set default 'supabase';
+-- The legacy URL field is retained for compatibility but is no longer required.
+alter table public.photos alter column url drop not null;
 
 create index if not exists idx_photos_created_at on public.photos(created_at desc);
 create index if not exists idx_photos_is_public on public.photos(is_public);

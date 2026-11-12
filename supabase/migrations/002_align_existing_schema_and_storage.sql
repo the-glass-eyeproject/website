@@ -30,6 +30,38 @@ create index if not exists idx_photos_created_at on public.photos(created_at des
 create index if not exists idx_photos_is_public on public.photos(is_public);
 create index if not exists idx_photos_uploaded_by on public.photos(uploaded_by);
 
+-- Ensure PostgREST can follow the photo/tag relationships used by the gallery.
+do $
+begin
+  if not exists (
+    select 1
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+    where c.conrelid = 'public.photo_tags'::regclass
+      and c.confrelid = 'public.photos'::regclass
+      and c.contype = 'f'
+      and a.attname = 'photo_id'
+  ) then
+    alter table public.photo_tags
+      add constraint photo_tags_photo_id_fkey
+      foreign key (photo_id) references public.photos(id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+    where c.conrelid = 'public.photo_tags'::regclass
+      and c.confrelid = 'public.tags'::regclass
+      and c.contype = 'f'
+      and a.attname = 'tag_id'
+  ) then
+    alter table public.photo_tags
+      add constraint photo_tags_tag_id_fkey
+      foreign key (tag_id) references public.tags(id) on delete cascade;
+  end if;
+end $;
+
 alter table public.photos enable row level security;
 alter table public.tags enable row level security;
 alter table public.photo_tags enable row level security;

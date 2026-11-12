@@ -15,7 +15,7 @@ export default function LoginPage() {
     fetch('/api/auth/check')
       .then(res => res.json())
       .then(data => {
-        if (data.authenticated) {
+        if (data.admin) {
           router.push('/admin');
         }
       });

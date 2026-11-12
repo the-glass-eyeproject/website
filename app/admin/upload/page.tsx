@@ -20,7 +20,7 @@ export default function UploadPage() {
       const response = await fetch('/api/auth/check');
       const data = await response.json();
       
-      if (!data.authenticated) {
+      if (!data.admin) {
         router.push('/login');
         return;
       }

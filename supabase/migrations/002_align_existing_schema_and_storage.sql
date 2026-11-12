@@ -71,6 +71,7 @@ drop policy if exists "Authenticated users can create tags" on public.tags;
 drop policy if exists "Admins can update tags" on public.tags;
 drop policy if exists "Admins can delete tags" on public.tags;
 drop policy if exists "Authenticated users can manage tags" on public.tags;
+drop policy if exists "Admins can manage tags" on public.tags;
 drop policy if exists "Tags are viewable by everyone" on public.tags;
 
 create policy "Tags are viewable by everyone"
@@ -84,6 +85,7 @@ drop policy if exists "Authenticated users can create photo tags" on public.phot
 drop policy if exists "Users can manage tags for their photos" on public.photo_tags;
 drop policy if exists "Photo tags are viewable by everyone" on public.photo_tags;
 drop policy if exists "Authenticated users can manage photo tags" on public.photo_tags;
+drop policy if exists "Admins can manage photo tags" on public.photo_tags;
 
 create policy "Photo tags are viewable by everyone"
   on public.photo_tags for select to anon, authenticated using (true);
@@ -101,6 +103,8 @@ on conflict (id) do update set public = false,
 
 drop policy if exists "Admins can upload gallery images" on storage.objects;
 drop policy if exists "Admins can read gallery images" on storage.objects;
+drop policy if exists "Public photos can read gallery images" on storage.objects;
+drop policy if exists "Admins can read all gallery images" on storage.objects;
 drop policy if exists "Admins can delete gallery images" on storage.objects;
 
 create policy "Admins can upload gallery images"

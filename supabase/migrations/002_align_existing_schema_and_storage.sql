@@ -102,7 +102,17 @@ drop policy if exists "Admins can delete gallery images" on storage.objects;
 create policy "Admins can upload gallery images"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'gallery' and (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
-create policy "Admins can read gallery images"
+create policy "Public photos can read gallery images"
+  on storage.objects for select to anon, authenticated
+  using (
+    bucket_id = 'gallery'
+    and exists (
+      select 1 from public.photos
+      where photos.storage_key = storage.objects.name
+        and photos.is_public = true
+    )
+  );
+create policy "Admins can read all gallery images"
   on storage.objects for select to authenticated
   using (bucket_id = 'gallery' and (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 create policy "Admins can delete gallery images"

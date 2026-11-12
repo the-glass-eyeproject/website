@@ -17,7 +17,7 @@ begin
   ) then
     execute 'update public.photos set storage_url = url where storage_url is null';
   end if;
-end $;
+end $$;
 
 alter table public.photos alter column storage_url set not null;
 

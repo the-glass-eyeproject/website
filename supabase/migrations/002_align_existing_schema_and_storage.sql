@@ -9,7 +9,7 @@ alter table public.photos
   add column if not exists is_public boolean not null default false;
 
 -- The previous schema called the URL column "url".
-do $$$
+do $
 begin
   if exists (
     select 1 from information_schema.columns

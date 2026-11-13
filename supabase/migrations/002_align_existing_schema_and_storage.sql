@@ -9,7 +9,7 @@ alter table public.photos
   add column if not exists is_public boolean not null default false;
 
 -- The previous schema called the URL column "url".
-do $$
+do $$$
 begin
   if exists (
     select 1 from information_schema.columns
@@ -31,7 +31,7 @@ create index if not exists idx_photos_is_public on public.photos(is_public);
 create index if not exists idx_photos_uploaded_by on public.photos(uploaded_by);
 
 -- Ensure PostgREST can follow the photo/tag relationships used by the gallery.
-do $
+do $$
 begin
   if not exists (
     select 1
@@ -60,7 +60,7 @@ begin
       add constraint photo_tags_tag_id_fkey
       foreign key (tag_id) references public.tags(id) on delete cascade;
   end if;
-end $;
+end $$;
 
 alter table public.photos enable row level security;
 alter table public.tags enable row level security;

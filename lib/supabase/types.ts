@@ -102,7 +102,22 @@ export interface Database {
           tag_id?: string
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'photo_tags_photo_id_fkey'
+            columns: ['photo_id']
+            isOneToOne: false
+            referencedRelation: 'photos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'photo_tags_tag_id_fkey'
+            columns: ['tag_id']
+            isOneToOne: false
+            referencedRelation: 'tags'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: {

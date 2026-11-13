@@ -5,15 +5,13 @@ export async function GET() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
+    const admin = user?.app_metadata?.role === 'admin'
     return NextResponse.json({
       authenticated: !!user,
-      user: user ? {
-        id: user.id,
-        email: user.email,
-      } : null,
+      admin,
+      user: user ? { id: user.id, email: user.email } : null,
     })
   } catch {
-    return NextResponse.json({ authenticated: false, user: null })
+    return NextResponse.json({ authenticated: false, admin: false, user: null })
   }
 }

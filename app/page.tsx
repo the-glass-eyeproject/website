@@ -17,7 +17,7 @@ export default function Home() {
     try {
       const response = await fetch('/api/auth/check');
       const data = await response.json();
-      setIsAuthenticated(data.authenticated);
+      setIsAuthenticated(data.admin);
     } catch {
       setIsAuthenticated(false);
     }
